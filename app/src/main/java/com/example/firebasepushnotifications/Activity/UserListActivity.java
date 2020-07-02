@@ -1,11 +1,11 @@
 package com.example.firebasepushnotifications.Activity;
 
+import android.os.Bundle;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
-import android.os.Bundle;
 
 import com.example.firebasepushnotifications.Adapter.UserAdapter;
 import com.example.firebasepushnotifications.Models.User;
@@ -19,6 +19,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class UserListActivity extends AppCompatActivity {
 
@@ -73,4 +74,24 @@ public class UserListActivity extends AppCompatActivity {
         });
     }
 
+    private void status(String status) {
+
+        databaseReference = FirebaseDatabase.getInstance().getReference("Users").child(firebaseUser.getUid());
+
+        HashMap<String, Object> hashMap = new HashMap<>();
+        hashMap.put("status", status);
+        databaseReference.updateChildren(hashMap);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        status("online");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        status("offline");
+    }
 }

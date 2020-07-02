@@ -1,24 +1,26 @@
 package com.example.firebasepushnotifications.Activity;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
-import android.content.Intent;
-import android.os.Bundle;
-import android.view.View;
-import android.widget.Toast;
-
 import com.example.firebasepushnotifications.APIService;
 import com.example.firebasepushnotifications.Adapter.MessageAdapter;
 import com.example.firebasepushnotifications.Models.Chat;
+import com.example.firebasepushnotifications.Models.User;
 import com.example.firebasepushnotifications.Notification.Client;
 import com.example.firebasepushnotifications.Notification.Data;
 import com.example.firebasepushnotifications.Notification.MyResponse;
 import com.example.firebasepushnotifications.Notification.Sender;
 import com.example.firebasepushnotifications.Notification.Token;
 import com.example.firebasepushnotifications.R;
-import com.example.firebasepushnotifications.Models.User;
 import com.example.firebasepushnotifications.databinding.ActivityMessageBinding;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -42,6 +44,7 @@ import retrofit2.Response;
 
 public class MessageActivity extends AppCompatActivity {
 
+    private static final String TAG = "MessageActivity";
     ActivityMessageBinding messageBinding;
     FirebaseUser firebaseUser;
     DatabaseReference databaseReference;
@@ -102,15 +105,18 @@ public class MessageActivity extends AppCompatActivity {
         messageBinding.sendId.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                notify = true;
                 if (!messageBinding.textSend.getText().toString().equals("")) {
                     String msg = messageBinding.textSend.getText().toString();
                     sendMessage(firebaseUser.getUid(), userid, msg);
+                } else {
+                    Toast.makeText(MessageActivity.this, "You can't send empty message", Toast.LENGTH_SHORT).show();
                 }
+                messageBinding.textSend.setText("");
             }
         });
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true);
         messageBinding.messageRecyclerViewId.setHasFixedSize(true);
         messageBinding.messageRecyclerViewId.setLayoutManager(layoutManager);
         messageAdapter = new MessageAdapter(this, chatsList);
@@ -156,9 +162,7 @@ public class MessageActivity extends AppCompatActivity {
 
         reference.child("Chats").push().setValue(hashMap);
 
-        final DatabaseReference chatRef = FirebaseDatabase.getInstance().getReference("Chatlist")
-                .child(firebaseUser.getUid())
-                .child(userid);
+        final DatabaseReference chatRef = FirebaseDatabase.getInstance().getReference("Chatlist").child(firebaseUser.getUid()).child(userid);
 
         chatRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -181,8 +185,9 @@ public class MessageActivity extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 User user = snapshot.getValue(User.class);
-                if(notify){
-                    sendNotification(receiver, user.getUsername(), msg);
+                if (notify) {
+                    Log.e(TAG, "Notify:" + notify);
+                    sendNotification(receiver, user.getUsername(), user.getImageURL(), msg);
                 }
                 notify = false;
             }
@@ -194,23 +199,34 @@ public class MessageActivity extends AppCompatActivity {
         });
     }
 
-    private void sendNotification(final String receiver, final String username, final String msg) {
+    private void currentUser(String userId) {
+        SharedPreferences.Editor editor = getSharedPreferences("CurrentUserPrefs", MODE_PRIVATE).edit();
+        editor.putString("currentUser", userId);
+        editor.apply();
+    }
+
+    private void sendNotification(final String receiver, final String username, final String imageURL, final String msg) {
 
         DatabaseReference tokens = FirebaseDatabase.getInstance().getReference("Tokens");
         Query query = tokens.orderByKey().equalTo(receiver);
         query.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
+                Log.e(TAG, "DataSnapshot:" + snapshot.hasChildren());
                 for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
                     Token token = dataSnapshot.getValue(Token.class);
-                    Data data = new Data(firebaseUser.getUid(), R.mipmap.ic_launcher, username + ": " + msg, "New Message", userid);
+                    Log.e(TAG, "User => " + firebaseUser.getUid());
+                    Log.e(TAG, "Body =>" + username + ": " + msg);
+                    Log.e(TAG, "Sent To =>" + userid);
+
+                    Data data = new Data(firebaseUser.getUid(), imageURL, username + ": " + msg, "New Message", userid);
                     Sender sender = new Sender(data, token.getToken());
                     apiService.sendNotification(sender).enqueue(new Callback<MyResponse>() {
                         @Override
                         public void onResponse(Call<MyResponse> call, Response<MyResponse> response) {
-                            if(response.code() == 200){
+                            if (response.code() == 200) {
 
-                                if(response.body().success == 1){
+                                if (response.body().success == 0) {
                                     Toast.makeText(MessageActivity.this, "Failed", Toast.LENGTH_SHORT).show();
                                 }
                             }
@@ -270,6 +286,7 @@ public class MessageActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         status("online");
+        currentUser(userid);
     }
 
     @Override
@@ -277,5 +294,6 @@ public class MessageActivity extends AppCompatActivity {
         super.onPause();
         databaseReference.removeEventListener(seenListener);
         status("offline");
+        currentUser("none");
     }
 }

@@ -1,21 +1,23 @@
 package com.example.firebasepushnotifications.Activity;
 
+import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.content.Intent;
-import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-
 import com.example.firebasepushnotifications.Adapter.UserAdapter;
+import com.example.firebasepushnotifications.Models.Chat;
 import com.example.firebasepushnotifications.Models.Chatlist;
+import com.example.firebasepushnotifications.Models.User;
 import com.example.firebasepushnotifications.Notification.Token;
 import com.example.firebasepushnotifications.R;
-import com.example.firebasepushnotifications.Models.User;
 import com.example.firebasepushnotifications.databinding.ActivityHomeBinding;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -28,14 +30,13 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.iid.InstanceIdResult;
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.FirebaseMessagingService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 
 public class HomeActivity extends AppCompatActivity {
 
+    private static final String TAG = "HomeActivity";
     ActivityHomeBinding binding;
     ArrayList<User> users = new ArrayList<>();
     UserAdapter userAdapter;
@@ -67,7 +68,6 @@ public class HomeActivity extends AppCompatActivity {
                     Chatlist chatlist = dataSnapshot.getValue(Chatlist.class);
                     usersList.add(chatlist);
                 }
-
                 chatList();
             }
 
@@ -88,15 +88,40 @@ public class HomeActivity extends AppCompatActivity {
             @Override
             public void onComplete(@NonNull Task<InstanceIdResult> task) {
 
-                if(!task.isSuccessful()){
+                if (!task.isSuccessful()) {
                     return;
                 }
                 String token = task.getResult().getToken();
+                Log.e(TAG, "Token: " + token);
                 updateToken(token);
-
             }
         });
 
+
+        databaseReference = FirebaseDatabase.getInstance().getReference("Chats");
+        databaseReference.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                int unread = 0;
+                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
+                    Chat chat = dataSnapshot.getValue(Chat.class);
+                    if (chat.getReceiver().equals(firebaseUser.getUid()) && !chat.isIsseen()) {
+                        unread++;
+                    }
+                }
+
+                if (unread == 0) {
+                    // No unread messages
+                } else {
+                    // print unread messages
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+
+            }
+        });
     }
 
     private void updateToken(String refreshToken) {
@@ -106,11 +131,12 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void chatList() {
+
         databaseReference = FirebaseDatabase.getInstance().getReference("Users");
         databaseReference.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                usersList.clear();
+                users.clear();
                 for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
                     User user = dataSnapshot.getValue(User.class);
                     for (Chatlist chatlist : usersList) {
