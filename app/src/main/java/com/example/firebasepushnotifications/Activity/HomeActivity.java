@@ -175,7 +175,6 @@ public class HomeActivity extends AppCompatActivity {
     private void status(String status) {
 
         databaseReference = FirebaseDatabase.getInstance().getReference("Users").child(firebaseUser.getUid());
-
         HashMap<String, Object> hashMap = new HashMap<>();
         hashMap.put("status", status);
         databaseReference.updateChildren(hashMap);
